@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                 String    @id @default(cuid())
+  createdAt          DateTime  @default(now())
+  campaignSource     String
+  deviceUserAgent    String?
+  ipAddress          String?
+  geoLat             Float?
+  geoLng             Float?
+  status             String    @default("init")
+  declaredName       String?
+  declaredEmployment String?
+  declaredIncome     Int?
+  loanAmountReq      Int?
+  loanPurpose        String?
+  endedAt            DateTime?
+
+  transcripts    Transcript[]
+  cvSignals      CvSignal[]
+  consentRecords ConsentRecord[]
+  videoBlobs     VideoBlob[]
+}
+
+model Transcript {
+  id         String   @id @default(cuid())
+  sessionId  String
+  turnIdx    Int
+  speaker    String
+  text       String
+  confidence Float
+  timestamp  DateTime
+  questionId String?
+  session    Session  @relation(fields: [sessionId], references: [id])
+}
+
+model CvSignal {
+  id               String   @id @default(cuid())
+  sessionId        String
+  timestamp        DateTime
+  ageEstimate      Float?
+  ageConfidence    Float
+  livenessScore    Float
+  facePresent      Boolean
+  blinkCountWindow Int
+  headPoseDelta    Float
+  session          Session  @relation(fields: [sessionId], references: [id])
+}
+
+model ConsentRecord {
+  id          String   @id @default(cuid())
+  sessionId   String
+  consentType String
+  verbalText  String
+  audioRef    String?
+  timestamp   DateTime
+  session     Session  @relation(fields: [sessionId], references: [id])
+}
+
+model VideoBlob {
+  id          String   @id @default(cuid())
+  sessionId   String
+  storageUri  String
+  durationSec Int
+  checksum    String
+  session     Session  @relation(fields: [sessionId], references: [id])
+}
