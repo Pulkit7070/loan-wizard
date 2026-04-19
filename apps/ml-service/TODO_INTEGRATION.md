@@ -1,4 +1,4 @@
-# ML Service — Integration Handoff
+# ML Service — Integration Handoff (v4)
 
 ## 1. Endpoint URL and Port
 
@@ -7,59 +7,134 @@ Base URL: http://localhost:8000   (local dev)
           http://ml-service:8000  (Docker network)
 ```
 
-| Endpoint | Method | Purpose |
+| Endpoint | Method | Description |
 |---|---|---|
-| `/offer` | POST | Primary: Stream C calls this |
-| `/mock/offer` | GET | Stream C dev mock (static response) |
+| `/offer` | POST | Primary: Stream C calls this — now returns fraud_score + reason_narrative |
+| `/decisions/{id}/replay` | POST | What-if replay on frozen snapshot |
+| `/models` | GET | Model registry listing |
+| `/drift/{feature}` | GET | Rolling stats for a feature |
+| `/drift/{feature}/baseline` | GET | Training-set baseline for a feature |
+| `/fairness/report` | GET | Approval rates + disparate impact ratio |
+| `/mock/offer` | GET | Static mock for parallel dev |
 | `/debug/risk-score` | POST | Dev only — raw risk score |
 | `/debug/persona` | POST | Dev only — raw persona |
 | `/health` | GET | Readiness probe |
 
-## 2. Env Variables Stream C Must Set (or leave default)
+## 2. Full `POST /offer` Response Shape (v4)
 
-```bash
-# If sharing a Postgres instance instead of the bundled db service:
-DATABASE_URL=postgresql://loan:loan@<shared-host>:5432/loan
-
-# Default (no change needed for demo):
-PERSONA_STRATEGY=rules_first
-USE_MOCK_BUREAU=true
-ENABLE_GEMINI_FALLBACK=false
+```json
+{
+  "session_id": "sess_abc",
+  "eligible": true,
+  "amount": 500000,
+  "interest_rate": 12.5,
+  "tenure_months": 36,
+  "emi": 16961,
+  "risk_band": "low",
+  "persona": "salaried_prime",
+  "reason_codes": [
+    { "code": "STABLE_INCOME", "label": "Stable monthly income", "weight": 0.35 }
+  ],
+  "rejection_reason": null,
+  "generated_at": "2026-04-19T10:00:00+00:00",
+  "fraud_score": 0.08,
+  "reason_narrative": "Approved. Salaried income of ₹75,000/mo and CIBIL 782. Rate 12.5% (low risk). EMI ₹16,961/mo over 36 months.",
+  "model_versions": {
+    "risk": "1.2.0",
+    "fraud": "0.1.0",
+    "persona_rules": "1.0.0"
+  }
+}
 ```
 
-Stream C should NOT set these (ML service owns them):
-- `DATABASE_URL` model schema (decisions table)
+`eligible: false` responses include `rejection_reason` and `reason_narrative` explaining why.
 
-## 3. Latency Concerns
+## 3. `POST /decisions/{id}/replay` Contract
 
-| Path | Cold start | Warm |
+```bash
+curl -X POST http://localhost:8000/decisions/42/replay \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "overrides": {
+      "form_data": { "monthly_income": 90000 },
+      "cv_signals_summary": { "min_liveness": 0.9 }
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "original": { "offer": {...}, "eligible": true, "risk_band": "low" },
+  "replayed": { "offer": {...}, "eligible": true, "risk_band": "low" },
+  "diff": [
+    { "field": "interest_rate", "from": 13.0, "to": 12.0 },
+    { "field": "emi", "from": 18200, "to": 16500 }
+  ]
+}
+```
+
+The `id` in the URL is the `decisions.id` primary key returned in the DB — Stream C can read it from the `decisions` table or store it alongside the session.
+
+## 4. Ops Endpoints for Stream C Dashboard
+
+### `GET /models`
+```json
+{
+  "risk":    { "version": "1.2.0", "loaded_at": "...", "backend": "keras" },
+  "fraud":   { "version": "0.1.0", "loaded_at": "...", "backend": "keras" },
+  "persona": { "version": "1.0.0", "loaded_at": "...", "backend": "rules" }
+}
+```
+
+### `GET /drift/{feature}`
+Available features: `monthly_income`, `loan_amount_requested`, `avg_liveness`, `fraud_score`, `risk_score`
+```json
+{ "feature": "monthly_income", "n": 837, "mean": 48230, "std": 21004, "p50": 45000, "p99": 130000 }
+```
+Append `/baseline` for the training-set distribution.
+
+### `GET /fairness/report`
+```json
+{
+  "by_employment": { "salaried": 1.0, "self_employed": 1.0, "unemployed": 0.0 },
+  "by_age_bucket": { "21-30": 1.0, "31-45": 1.0, "46-65": 1.0 },
+  "disparate_impact_ratio": 0.85
+}
+```
+
+## 5. Redis Stream Names + Payload Schema
+
+Set `EVENT_STREAM_URL=redis://localhost:6379` to enable.
+
+| Stream | Published when | Key fields |
 |---|---|---|
-| Inline TF model | ~2s at startup | <50ms/req |
-| Rules-based persona | 0ms | <1ms |
-| Gemma 2B persona | ~15s at startup | ~2s/req |
-| Gemini API persona | 0ms | ~800ms/req |
+| `decisions` | Every `POST /offer` | `session_id`, `tenant_id`, `request`, `offer`, `model_versions` |
+| `frauds` | When `fraud_score > 0.7` | `session_id`, `fraud_score`, `signals` |
+| `offers` | (reserved for future) | — |
 
-**Default config uses rules-based persona** — no LLM latency.
-If Gemma is enabled, warm up starts at service boot; first request won't block.
+If `EVENT_STREAM_URL` is unset, events log to stdout only.
 
-## 4. DB Connection Expectations
+## 6. All New Env Variables (v4)
 
-- This service owns and writes to the `decisions` table only.
-- Stream C owns: `sessions`, `transcripts`, `cv_signals`, `consent_records`, `video_blobs`.
-- To use a shared Postgres: change `DATABASE_URL` in docker-compose.yml and remove the `db` service.
-- Tables are created automatically on startup via `Base.metadata.create_all()`.
+| Variable | Default | Description |
+|---|---|---|
+| `BUREAU_ADAPTERS` | `cibil,experian` | Comma-separated bureau adapter names |
+| `BUREAU_MERGE_STRATEGY` | `weighted` | `max`, `avg`, or `weighted` |
+| `ENABLE_GEMMA` | `false` | Load Gemma 2B for LLM narration (+15s startup) |
+| `ENABLE_GEMINI_FALLBACK` | `false` | Use Gemini API as LLM narrator |
+| `GEMINI_API_KEY` | — | Required if ENABLE_GEMINI_FALLBACK=true |
+| `REASON_NARRATOR_MODE` | `template` | `template` (deterministic) or `llm` |
+| `EVENT_STREAM_URL` | — | Redis URL; stdout-only if unset |
+| `DATABASE_URL` | `postgresql://loan:loan@db:5432/loan` | Postgres connection |
+| `PERSONA_STRATEGY` | `rules_first` | `rules_first` or `rules_only` |
+| `USE_MOCK_BUREAU` | `true` | Only option for demo |
 
-## 5. Known Limits
+## 7. Known Limits
 
-- **Risk model trained on synthetic data** — scores are directionally correct, not calibrated to real defaults.
-- **Reason codes are illustrative** — derived from feature magnitude, not SHAP values.
-- **Bureau data is mocked** — `USE_MOCK_BUREAU=true` is the only supported mode for demo.
-- **Gemma 2B** requires ~5GB RAM and ~15s cold start. Use Gemini fallback or rules-only for resource-constrained envs.
-- **No rate limiting** — assumes internal network, single-user demo.
-
-## 6. Stream C Dev Workflow
-
-1. Point `OFFER_API_URL=http://localhost:8000/mock/offer` during parallel dev.
-2. Once this service is up, switch to `POST http://localhost:8000/offer`.
-3. Request schema: see `app/schemas.py → OfferRequest`.
-4. Response always 200; check `eligible` field to distinguish approved vs rejected.
+- **Both ML models trained on synthetic data** — risk and fraud scores are directionally correct, not calibrated.
+- **Reason narrative** uses the Jinja template by default — it mentions CIBIL score and rate. For production, enable Gemini for more natural language.
+- **Drift stats are in-memory** — lost on restart in single-replica mode. Back by Redis for persistence.
+- **Fairness cohort is synthetic** — all incomes above ₹15k pass policy, making disparate impact ratio = 1.0 for the demo.
+- **Decision replay** uses the current in-memory model, not a versioned archive — if models retrain, replayed scores may differ slightly.
+- **`decisions.id`** is the replay lookup key — Stream C should persist it alongside session_id for replay UX.

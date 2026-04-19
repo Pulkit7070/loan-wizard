@@ -12,6 +12,8 @@ from app.models.risk_mlp.features import build_feature_vector, get_feature_impor
 
 logger = logging.getLogger(__name__)
 
+VERSION = "1.2.0"
+
 MODEL_PATH = Path(__file__).parent.parent / "models" / "risk_mlp" / "keras_model.h5"
 
 # Scaler params stored alongside the model (populated at train time)

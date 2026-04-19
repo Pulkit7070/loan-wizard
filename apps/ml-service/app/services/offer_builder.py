@@ -1,10 +1,13 @@
-"""Combines policy + risk + persona into a final Offer."""
+"""Combines policy + risk + persona + fraud + narration into a final Offer."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.schemas import (
     FormData,
+    FraudScoreOutput,
+    ModelVersions,
     Offer,
     PersonaClassificationOutput,
     PolicyResult,
@@ -33,7 +36,6 @@ REASON_CODE_LABELS = {
 
 
 def _calculate_emi(principal: float, annual_rate_pct: float, tenure_months: int) -> float:
-    """Standard reducing-balance EMI formula."""
     if annual_rate_pct == 0:
         return principal / tenure_months
     r = annual_rate_pct / 100 / 12
@@ -60,6 +62,8 @@ class OfferBuilder:
         policy: PolicyResult,
         risk: RiskScoreOutput,
         persona: PersonaClassificationOutput,
+        fraud: Optional[FraudScoreOutput] = None,
+        model_versions: Optional[ModelVersions] = None,
     ) -> Offer:
         base = Offer(
             session_id=session_id,
@@ -73,6 +77,8 @@ class OfferBuilder:
             reason_codes=[],
             rejection_reason=None,
             generated_at=_now_iso(),
+            fraud_score=fraud.fraud_score if fraud else None,
+            model_versions=model_versions,
         )
 
         if not policy.passed:
@@ -82,9 +88,15 @@ class OfferBuilder:
         # Base rate
         rate = BASE_RATE_BY_BAND[risk.risk_band]
 
-        # Soft-flag rate adjustments
+        # Soft-flag adjustments
         for rule in policy.passed_rules:
             rate += SOFT_FLAG_RATE_ADJUSTMENTS.get(rule, 0.0)
+
+        # Fraud surcharge
+        if fraud and fraud.fraud_score > 0.6:
+            rate += 1.5
+        elif fraud and fraud.fraud_score > 0.4:
+            rate += 0.75
 
         # Persona tweaks
         if persona.persona == "salaried_prime":
