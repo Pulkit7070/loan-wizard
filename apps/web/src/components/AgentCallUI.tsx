@@ -1,12 +1,19 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { PerceptionEvent, FormData, CVSignal } from '@loan-wizard/contracts';
 import { usePerception } from '@loan-wizard/perception';
 import { VideoPanel } from './VideoPanel';
 import { FormSidePanel } from './FormSidePanel';
 import { CVIndicatorStrip } from './CVIndicatorStrip';
 import { RecordingIndicator } from './RecordingIndicator';
+import { SessionProgressBar } from './call/SessionProgressBar';
+import { DocumentCaptureOverlay } from './call/DocumentCaptureOverlay';
+import { YawChallengeOverlay } from './call/YawChallengeOverlay';
+import { Button } from './ui/Button';
+
+type Overlay = 'none' | 'document' | 'yaw';
 
 export function AgentCallUI({ sessionId }: { sessionId: string }) {
   const router = useRouter();
@@ -15,6 +22,8 @@ export function AgentCallUI({ sessionId }: { sessionId: string }) {
   const [elapsed, setElapsed] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [ending, setEnding] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay>('none');
+  const [step, setStep] = useState(1); // 0=Permissions,1=Questions,2=Documents,3=Consent,4=Processing
   const endingRef = useRef(false);
 
   useEffect(() => {
@@ -31,7 +40,6 @@ export function AgentCallUI({ sessionId }: { sessionId: string }) {
   }, [sessionId, router]);
 
   const handleEvent = useCallback(async (event: PerceptionEvent) => {
-    // Persist everything fire-and-forget
     fetch(`/api/session/${sessionId}/event`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -47,9 +55,26 @@ export function AgentCallUI({ sessionId }: { sessionId: string }) {
         break;
       case 'question_asked':
         setCurrentQuestion(event.payload.text);
+        setStep(1);
         break;
       case 'session_ended':
         await endSession();
+        break;
+      case 'document_capture_started':
+        setOverlay('document');
+        setStep(2);
+        break;
+      case 'document_captured':
+        setOverlay('none');
+        break;
+      case 'challenge_requested':
+        setOverlay('yaw');
+        break;
+      case 'challenge_completed':
+        setOverlay('none');
+        break;
+      case 'consent_captured':
+        setStep(3);
         break;
     }
   }, [sessionId, endSession]);
@@ -59,73 +84,74 @@ export function AgentCallUI({ sessionId }: { sessionId: string }) {
     onEvent: handleEvent,
   });
 
-  // Start perception once mounted — permissions already granted by PermissionGate
-  useEffect(() => {
-    start();
-  }, [start]);
+  useEffect(() => { start(); }, [start]);
 
   if (perceptionError) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center max-w-sm px-6">
-          <p className="text-red-600 font-semibold mb-2">Camera or microphone error</p>
-          <p className="text-gray-500 text-sm mb-4">{perceptionError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-navy text-white rounded-xl"
-          >
-            Try again
-          </button>
+          <p className="text-(--color-danger) font-semibold mb-2">Camera or microphone error</p>
+          <p className="text-(--color-muted) text-sm mb-4">{perceptionError}</p>
+          <Button onClick={() => window.location.reload()}>Try again</Button>
         </div>
       </div>
     );
   }
 
-  const statusText = (() => {
-    if (status === 'requesting_permissions') return 'Requesting permissions…';
-    if (status === 'running' && currentQuestion) return currentQuestion;
-    if (status === 'running') return 'Starting session…';
-    if (status === 'ended') return 'Session complete';
-    return 'Waiting…';
-  })();
+  const statusText = status === 'running' && currentQuestion ? currentQuestion
+    : status === 'running' ? 'Starting session…'
+    : status === 'ended' ? 'Session complete'
+    : 'Waiting…';
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-(--color-bg)">
+      <AnimatePresence>
+        {overlay === 'document' && (
+          <DocumentCaptureOverlay onDone={() => setOverlay('none')} />
+        )}
+        {overlay === 'yaw' && (
+          <YawChallengeOverlay onComplete={() => setOverlay('none')} />
+        )}
+      </AnimatePresence>
+
+      {/* Progress */}
+      <SessionProgressBar currentStep={step} />
+
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+      <div className="flex items-center justify-between px-6 py-2.5 bg-(--color-surface) border-b border-(--color-muted)/10">
         <RecordingIndicator elapsed={elapsed} />
-        <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+        <span className="text-xs text-(--color-muted) bg-(--color-muted)/10 px-3 py-1 rounded-full">
           🔒 RBI Video-KYC Compliant
         </span>
       </div>
 
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 p-4">
+        <motion.div
+          className="flex-1 p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
           <VideoPanel videoRef={videoRef} />
-        </div>
+        </motion.div>
         <div className="w-80 flex-shrink-0">
           <FormSidePanel form={form} />
         </div>
       </div>
 
-      {/* CV strip */}
       <CVIndicatorStrip signal={latestCv} />
 
-      {/* Question bar + end button */}
-      <div className="px-6 py-3 bg-white border-t border-gray-200 flex items-center justify-between gap-4">
-        <p className="text-sm text-gray-700 flex-1">
+      {/* Question bar */}
+      <div className="px-6 py-3 bg-(--color-surface) border-t border-(--color-muted)/10 flex items-center justify-between gap-4">
+        <p className="text-sm text-(--color-fg) flex-1">
           {status === 'running' && currentQuestion
-            ? <><span className="font-medium">Agent:</span> {statusText}</>
+            ? <><span className="font-semibold">Agent:</span> {statusText}</>
             : statusText}
         </p>
-        <button
-          onClick={endSession}
-          disabled={ending}
-          className="shrink-0 px-4 py-2 text-sm bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-        >
+        <Button variant="danger" size="sm" onClick={endSession} disabled={ending} aria-label="End call">
           {ending ? 'Ending…' : 'End call'}
-        </button>
+        </Button>
       </div>
     </div>
   );

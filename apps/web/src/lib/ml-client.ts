@@ -2,9 +2,7 @@ import type { Offer, RiskScoreInput } from '@loan-wizard/contracts';
 import { MOCK_OFFER } from '@loan-wizard/contracts';
 import { config } from './config';
 
-export async function getOffer(
-  input: RiskScoreInput & { transcript_snippets?: string[] },
-): Promise<Offer> {
+export async function getOffer(input: RiskScoreInput): Promise<Offer> {
   if (config.mlMode === 'mock') {
     await new Promise((r) => setTimeout(r, 1500));
     return { ...MOCK_OFFER, session_id: input.session_id };

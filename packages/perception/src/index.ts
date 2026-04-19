@@ -14,6 +14,10 @@ export interface PerceptionConfig {
   ageModelUrl?: string;
   onEvent: (event: PerceptionEvent) => void;
   script?: AgentScript;
+  // v4 additions (all optional, backward-compatible)
+  language?: 'en' | 'hi';
+  enableDocCapture?: boolean;
+  enableYawChallenge?: boolean;
 }
 
 export interface PerceptionHandle {
@@ -22,6 +26,9 @@ export interface PerceptionHandle {
   start: () => Promise<void>;
   stop: () => void;
   error: string | null;
+  // v4 additions
+  setLanguage: (lang: 'en' | 'hi') => void;
+  captureDocument: (docType: 'aadhaar' | 'pan') => Promise<void>;
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

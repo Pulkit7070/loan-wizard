@@ -62,6 +62,9 @@ export const MOCK_OFFER: Offer = {
   ],
   rejection_reason: null,
   generated_at: new Date().toISOString(),
+  fraud_score: 0.05,
+  reason_narrative: 'Stable income with a clean credit profile makes this a low-risk applicant.',
+  model_versions: { risk: '1.2.0', fraud: '0.1.0', persona_rules: '1.0.0' },
 };
 
 export const MOCK_TRANSCRIPT: TranscriptTurn[] = [

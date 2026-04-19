@@ -7,7 +7,18 @@ export class AudioBuffer {
 
   start(stream: MediaStream): void {
     this.blobs = [];
-    this.recorder = new MediaRecorder(stream, { mimeType: this.bestMime() });
+    // MediaRecorder with an audio mimeType cannot accept a stream that also
+    // contains video tracks on some browsers (Windows Chrome throws
+    // NotSupportedError). Build an audio-only stream from the audio tracks.
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) throw new Error('No audio tracks in stream');
+    const audioStream = new MediaStream(audioTracks);
+
+    const mime = this.bestMime();
+    this.recorder = mime
+      ? new MediaRecorder(audioStream, { mimeType: mime })
+      : new MediaRecorder(audioStream);
+
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.blobs.push(e.data);
       // Keep a rolling 10s window — each chunk is ~1s

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -16,12 +15,18 @@ model Session {
   geoLat             Float?
   geoLng             Float?
   status             String    @default("init")
+  tenantId           String    @default("alpha")
   declaredName       String?
   declaredEmployment String?
   declaredIncome     Int?
   loanAmountReq      Int?
   loanPurpose        String?
   endedAt            DateTime?
+  offerJson          String?
+  agentNotes            String?
+  deletedAt             DateTime?
+  deviceFingerprint     String?   // JSON blob from Stream A device_fingerprint event
+  documentCapturesJson  String?   // JSON array of document_captured payloads
 
   transcripts    Transcript[]
   cvSignals      CvSignal[]
@@ -51,6 +56,7 @@ model CvSignal {
   facePresent      Boolean
   blinkCountWindow Int
   headPoseDelta    Float
+  textureScore     Float?
   session          Session  @relation(fields: [sessionId], references: [id])
 }
 
@@ -71,4 +77,40 @@ model VideoBlob {
   durationSec Int
   checksum    String
   session     Session  @relation(fields: [sessionId], references: [id])
+}
+
+// Stream B (ML service) owns these tables — managed by SQLAlchemy, not Prisma
+model Decision {
+  id               Int       @id @default(autoincrement())
+  sessionId        String    @unique @map("session_id")
+  tenantId         String    @default("default") @map("tenant_id")
+  policyPassed     Boolean   @map("policy_passed")
+  failedRules      Json      @default("[]") @map("failed_rules")
+  riskBand         String?   @map("risk_band")
+  riskScore        Float?    @map("risk_score")
+  fraudScore       Float?    @map("fraud_score")
+  persona          String?
+  offerAmount      Int?      @map("offer_amount")
+  offerRate        Float?    @map("offer_rate")
+  offerTenure      Int?      @map("offer_tenure")
+  offerEmi         Int?      @map("offer_emi")
+  reasonCodes      Json      @default("[]") @map("reason_codes")
+  reasonNarrative  String?   @map("reason_narrative")
+  modelVersions    Json      @default("{}") @map("model_versions")
+  decidedAt        DateTime? @map("decided_at")
+
+  @@map("decisions")
+}
+
+model DecisionSnapshot {
+  id                    Int      @id @default(autoincrement())
+  decisionId            Int      @map("decision_id")
+  sessionId             String   @unique @map("session_id")
+  tenantId              String   @default("default") @map("tenant_id")
+  inputSnapshot         Json     @map("input_snapshot")
+  outputSnapshot        Json     @map("output_snapshot")
+  modelVersionsAtDecision Json   @default("{}") @map("model_versions_at_decision")
+  createdAt             DateTime? @map("created_at")
+
+  @@map("decision_snapshots")
 }

@@ -1,93 +1,152 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { ShieldCheck, Video, Mic, Clock, CheckCircle2 } from 'lucide-react';
 import { ConsentBanner } from '../components/ConsentBanner';
-import { ShieldCheck, Video, Mic, Clock } from 'lucide-react';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { Button } from '../components/ui/Button';
+import { useT } from '../components/I18nProvider';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { t } = useT();
   const [loading, setLoading] = useState(false);
 
   async function startSession() {
     setLoading(true);
-    const res = await fetch('/api/session/start', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        campaign_source: new URLSearchParams(window.location.search).get('src') ?? 'direct',
-        device_user_agent: navigator.userAgent,
-      }),
-    });
-    const { session_id } = await res.json();
-    router.push(`/session/${session_id}`);
+    try {
+      const res = await fetch('/api/session/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          campaign_source: new URLSearchParams(window.location.search).get('src') ?? 'direct',
+          device_user_agent: navigator.userAgent,
+        }),
+      });
+      const { session_id } = await res.json();
+      router.push(`/session/${session_id}`);
+    } catch {
+      setLoading(false);
+    }
   }
 
   return (
     <>
       <ConsentBanner />
-      <main className="max-w-2xl mx-auto px-6 py-16">
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-navy mb-4">
-            Your loan offer, in under 2 minutes
-          </h1>
-          <p className="text-lg text-gray-600">
-            Answer 4 simple questions via video and get a personalised offer instantly.
-          </p>
+
+      {/* Nav */}
+      <header className="sticky top-0 z-40 bg-(--color-surface)/95 backdrop-blur border-b border-(--color-muted)/10">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+          <span className="font-bold text-(--color-fg) text-lg">LoanWizard</span>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <span className="text-xs bg-(--color-muted)/10 text-(--color-muted) px-3 py-1 rounded-full hidden sm:block">
+              🔒 RBI Compliant
+            </span>
+          </div>
         </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6">
+        {/* Hero */}
+        <section className="py-20 text-center">
+          <motion.h1
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-5xl font-bold text-(--color-fg) leading-tight mb-4"
+          >
+            {t('landing.hero')}
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-lg text-(--color-muted) max-w-xl mx-auto mb-10"
+          >
+            {t('landing.sub')}
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Button size="lg" onClick={startSession} loading={loading} aria-label="Start loan session">
+              {loading ? t('landing.starting') : t('landing.cta')}
+            </Button>
+          </motion.div>
+        </section>
 
         {/* How it works */}
-        <div className="grid grid-cols-1 gap-4 mb-10">
-          <FeatureRow icon={<Video size={20} />} title="Video interview" desc="A short AI-guided video call — no branch visit, no paperwork." />
-          <FeatureRow icon={<Mic size={20} />} title="Voice-powered form" desc="Just speak; we extract your details automatically." />
-          <FeatureRow icon={<Clock size={20} />} title="Instant decision" desc="Your offer is ready the moment the call ends." />
-          <FeatureRow icon={<ShieldCheck size={20} />} title="RBI & DPDP compliant" desc="Video-KYC meets RBI guidelines. Data retained 5 years per regulation." />
-        </div>
+        <section className="pb-16">
+          <h2 className="text-center text-xl font-bold text-(--color-fg) mb-8">{t('landing.how')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { n: 1, title: t('landing.step1.title'), desc: t('landing.step1.desc') },
+              { n: 2, title: t('landing.step2.title'), desc: t('landing.step2.desc') },
+              { n: 3, title: t('landing.step3.title'), desc: t('landing.step3.desc') },
+            ].map(({ n, title, desc }) => (
+              <div key={n} className="flex flex-col items-center text-center p-6 bg-(--color-surface) rounded-[var(--radius-lg)] border border-(--color-muted)/10 shadow-sm">
+                <span className="w-10 h-10 rounded-full bg-(--color-brand) text-(--color-brand-fg) flex items-center justify-center font-bold mb-4">{n}</span>
+                <p className="font-semibold text-(--color-fg) mb-1">{title}</p>
+                <p className="text-sm text-(--color-muted)">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {/* DPDP consent block */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-10 text-sm text-blue-900">
-          <p className="font-semibold mb-2">Data Collection — DPDP Act 2023</p>
-          <ul className="list-disc list-inside space-y-1 text-blue-800">
-            <li>Video &amp; audio recording for identity verification</li>
-            <li>Microphone transcription to auto-fill your application</li>
-            <li>Location for fraud prevention and compliance</li>
-            <li>Data retained for 5 years per RBI Video-KYC guidelines</li>
-            <li>You have the right to access or request deletion of your data</li>
-          </ul>
-        </div>
+        {/* Trust cards */}
+        <section className="pb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: <Video size={20} />, title: t('landing.trust1.title'), desc: t('landing.trust1.desc') },
+              { icon: <Mic size={20} />, title: t('landing.trust2.title'), desc: t('landing.trust2.desc') },
+              { icon: <Clock size={20} />, title: t('landing.trust3.title'), desc: t('landing.trust3.desc') },
+              { icon: <ShieldCheck size={20} />, title: t('landing.trust4.title'), desc: t('landing.trust4.desc') },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="p-4 bg-(--color-surface) rounded-[var(--radius-lg)] border border-(--color-muted)/10 shadow-sm">
+                <span className="text-(--color-brand) mb-3 block">{icon}</span>
+                <p className="font-semibold text-(--color-fg) text-sm">{title}</p>
+                <p className="text-xs text-(--color-muted) mt-1">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {/* RBI retention notice */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-10 text-sm text-amber-900">
-          <strong>RBI Video-KYC Retention Notice:</strong> Your video recording will be stored
-          securely for a minimum of 5 years as required by RBI Master Direction on KYC.
-        </div>
-
-        <button
-          onClick={startSession}
-          disabled={loading}
-          className="w-full bg-navy text-white py-4 rounded-xl text-lg font-semibold hover:bg-[#0d3060] transition-colors disabled:opacity-60"
-        >
-          {loading ? 'Starting…' : 'Start my session →'}
-        </button>
-
-        <p className="text-center text-xs text-gray-400 mt-4">
-          By continuing you agree to our{' '}
-          <a href="#" className="underline">Terms &amp; Conditions</a> and{' '}
-          <a href="#" className="underline">Privacy Policy</a>.
-        </p>
+        {/* Compliance */}
+        <section className="pb-20 grid md:grid-cols-2 gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-[var(--radius-lg)] p-5 text-sm text-blue-900">
+            <p className="font-semibold mb-2">{t('landing.dpdp.title')}</p>
+            <ul className="space-y-1 text-blue-800">
+              {([1,2,3,4,5] as const).map((i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
+                  {t(`landing.dpdp.item${i}`)}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius-lg)] p-4 text-sm text-amber-900">
+              {t('landing.rbi')}
+            </div>
+            <div className="flex-1 flex flex-col justify-end">
+              <Button size="lg" onClick={startSession} loading={loading} className="w-full">
+                {loading ? t('landing.starting') : t('landing.cta')}
+              </Button>
+              <p className="text-xs text-(--color-muted) text-center mt-3">{t('landing.terms')}</p>
+            </div>
+          </div>
+        </section>
       </main>
-    </>
-  );
-}
 
-function FeatureRow({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="flex gap-4 items-start p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
-      <span className="mt-0.5 text-navy">{icon}</span>
-      <div>
-        <p className="font-semibold text-navy">{title}</p>
-        <p className="text-gray-600 text-sm">{desc}</p>
-      </div>
-    </div>
+      {/* Footer */}
+      <footer className="border-t border-(--color-muted)/10 py-6 text-center text-xs text-(--color-muted)">
+        <p>LoanWizard · RBI Reg. NBFC · DPDP Compliant · IRDAI Notice: No insurance product</p>
+        <p className="mt-1">
+          <a href="/admin" className="underline hover:text-(--color-fg) transition-colors">Admin</a>
+          {' · '}
+          <a href="#" className="underline hover:text-(--color-fg) transition-colors">Privacy</a>
+          {' · '}
+          <a href="#" className="underline hover:text-(--color-fg) transition-colors">Terms</a>
+        </p>
+      </footer>
+    </>
   );
 }

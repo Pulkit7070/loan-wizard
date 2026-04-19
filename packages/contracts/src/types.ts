@@ -39,6 +39,7 @@ export interface CVSignal {
   face_present: boolean;
   blink_count_window: number; // blinks in last 5 sec
   head_pose_delta: number; // degrees moved since last frame
+  texture_score?: number | null; // 0-1, anti-deepfake Laplacian sharpness
 }
 
 // ============ Form Data ============
@@ -53,15 +54,28 @@ export interface FormData {
   declared_age?: number | null;
 }
 
+// ============ Device Fingerprint ============
+export interface DeviceFingerprint {
+  ua: string;
+  canvas_hash: string;
+  timezone: string;
+  session_age_sec?: number;
+  form_mutations?: number;
+  transcript_length?: number;
+  canvas_hash_cohort_size?: number;
+}
+
 // ============ ML Inputs & Outputs ============
 export interface RiskScoreInput {
   session_id: string;
+  tenant_id?: string;
   form_data: FormData;
   cv_signals_summary: {
     avg_age_estimate: number | null;
     avg_liveness: number;
     min_liveness: number;
     face_present_ratio: number;
+    texture_score_avg?: number;
   };
   geo?: { lat: number; lng: number };
   bureau_mock?: {
@@ -69,6 +83,8 @@ export interface RiskScoreInput {
     existing_loans: number;
     default_history: boolean;
   };
+  device_fingerprint?: DeviceFingerprint;
+  transcript_snippets?: string[];
 }
 
 export interface RiskScoreOutput {
@@ -103,6 +119,10 @@ export interface Offer {
   reason_codes: Array<{ code: string; label: string; weight: number }>;
   rejection_reason: string | null;
   generated_at: string; // ISO
+  // v4 additions
+  fraud_score?: number | null;
+  reason_narrative?: string | null;
+  model_versions?: { risk: string; fraud: string; persona_rules: string } | null;
 }
 
 // ============ Consent & Audit ============
@@ -131,4 +151,31 @@ export type PerceptionEvent =
   | { type: 'form_field_extracted'; payload: { field: keyof FormData; value: any; confidence: number } }
   | { type: 'question_asked'; payload: { question_id: string; text: string } }
   | { type: 'session_ended'; payload: { reason: 'complete' | 'user_abort' | 'error' } }
-  | { type: 'error'; payload: { code: string; message: string } };
+  | { type: 'error'; payload: { code: string; message: string } }
+  // v4 additions
+  | { type: 'language_detected'; payload: { lang: 'en' | 'hi' } }
+  | { type: 'device_fingerprint'; payload: {
+      ua: string;
+      screen: { w: number; h: number; dpr: number };
+      canvas_hash: string;
+      timezone: string;
+      lang: string;
+    };
+  }
+  | { type: 'document_capture_started'; payload: { doc_type: 'aadhaar' | 'pan' } }
+  | { type: 'document_captured'; payload: {
+      doc_type: 'aadhaar' | 'pan';
+      ocr: Record<string, string>;
+      image_hash: string;
+      confidence: number;
+    };
+  }
+  | { type: 'challenge_requested'; payload: { challenge: 'yaw'; instruction: string } }
+  | { type: 'challenge_completed'; payload: { challenge: 'yaw'; passed: boolean } }
+  | { type: 'consent_captured'; payload: {
+      consent_type: 'video_kyc' | 'data_processing' | 'credit_pull';
+      verbal_text: string;
+      audio_ref: string | null;
+      text_hash: string;
+    };
+  };

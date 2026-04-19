@@ -106,14 +106,21 @@ class PersonaClassifier:
     def _llm_classify(
         self, form: FormData, transcript_snippets: list[str]
     ) -> Optional[PersonaClassificationOutput]:
+        # Nothing to do if no LLM backend is wired up. Skip before touching
+        # the prompt template, whose JSON examples confuse str.format().
+        if self._gemma is None and self._gemini is None:
+            return None
+
         prompt_template = PROMPT_PATH.read_text()
         form_summary = (
             f"employment={form.employment_type}, income={form.monthly_income}, "
             f"loan={form.loan_amount_requested}, age={form.declared_age}, purpose={form.purpose}"
         )
-        prompt = prompt_template.format(
-            transcript_snippets="\n".join(transcript_snippets[:5]),
-            form_summary=form_summary,
+        # Use a lenient substitution that tolerates literal braces in the template
+        prompt = (
+            prompt_template
+            .replace("{transcript_snippets}", "\n".join(transcript_snippets[:5]))
+            .replace("{form_summary}", form_summary)
         )
 
         raw = None

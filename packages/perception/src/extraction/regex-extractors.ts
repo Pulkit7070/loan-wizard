@@ -126,6 +126,22 @@ export function extractLoanDetails(
   return { value: { amount: amount ?? null, purpose }, confidence };
 }
 
+export function extractAge(transcript: string): ExtractResult<number> | null {
+  const t = transcript.toLowerCase();
+  // "I am 28 years old" / "I'm 35" / "28" / "twenty eight"
+  const digitMatch = t.match(/\b(\d{2})\s*(?:years?(?:\s*old)?)?/);
+  if (digitMatch) {
+    const age = parseInt(digitMatch[1], 10);
+    if (age >= 18 && age <= 75) return { value: age, confidence: 0.9 };
+  }
+  // word numbers for age
+  const amount = parseIndianNumber(transcript);
+  if (amount !== null && amount >= 18 && amount <= 75) {
+    return { value: amount, confidence: 0.7 };
+  }
+  return null;
+}
+
 export function extractConsent(transcript: string): ExtractResult<boolean> | null {
   if (/yes|i consent|continue|sure|okay|agree|proceed/i.test(transcript)) {
     return { value: true, confidence: 0.9 };
@@ -139,6 +155,7 @@ export function extractConsent(transcript: string): ExtractResult<boolean> | nul
 // Convenience map so script.ts can reference by field key
 export const FIELD_EXTRACTORS: Partial<Record<keyof FormData, (t: string) => ExtractResult<any> | null>> = {
   name: extractName,
+  declared_age: extractAge,
   employment_type: extractEmployment,
   monthly_income: extractIncome,
   loan_amount_requested: (t) => {

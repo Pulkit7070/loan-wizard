@@ -26,6 +26,7 @@ export async function logCvSignal(sessionId: string, signal: CVSignal) {
       facePresent: signal.face_present,
       blinkCountWindow: signal.blink_count_window,
       headPoseDelta: signal.head_pose_delta,
+      textureScore: signal.texture_score ?? null,
     },
   });
 }

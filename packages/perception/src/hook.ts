@@ -7,7 +7,6 @@ export function usePerception(config: PerceptionConfig): PerceptionHandle {
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const engineRef = useRef<PerceptionEngine | null>(null);
-  // Keep a stable ref to config.onEvent to avoid stale closures
   const onEventRef = useRef(config.onEvent);
   onEventRef.current = config.onEvent;
 
@@ -28,7 +27,6 @@ export function usePerception(config: PerceptionConfig): PerceptionHandle {
     });
 
     engineRef.current = engine;
-
     if (videoRef.current) engine.attachVideo(videoRef.current);
 
     try {
@@ -46,14 +44,21 @@ export function usePerception(config: PerceptionConfig): PerceptionHandle {
     setStatus('ended');
   }, []);
 
-  // Wire video ref to engine if ref becomes available after start
+  const setLanguage = useCallback((lang: 'en' | 'hi') => {
+    engineRef.current?.setLanguage(lang);
+  }, []);
+
+  const captureDocument = useCallback(async (docType: 'aadhaar' | 'pan') => {
+    await engineRef.current?.captureDocument(docType);
+  }, []);
+
+  // Wire video ref once engine exists — idempotent via attachStreamToVideo guard
   useEffect(() => {
     if (videoRef.current && engineRef.current) {
       engineRef.current.attachVideo(videoRef.current);
     }
   });
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       engineRef.current?.stop();
@@ -61,5 +66,5 @@ export function usePerception(config: PerceptionConfig): PerceptionHandle {
     };
   }, []);
 
-  return { status, videoRef, start, stop, error };
+  return { status, videoRef, start, stop, error, setLanguage, captureDocument };
 }

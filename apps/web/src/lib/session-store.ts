@@ -1,4 +1,4 @@
-import type { FormData, CVSignal, Offer } from '@loan-wizard/contracts';
+import type { FormData, CVSignal, Offer, DeviceFingerprint } from '@loan-wizard/contracts';
 
 interface SessionState {
   formData: Partial<FormData>;
@@ -6,6 +6,7 @@ interface SessionState {
   transcriptSnippets: string[];
   offer: Offer | null;
   startedAt: number;
+  deviceFingerprint?: DeviceFingerprint;
 }
 
 const store = new Map<string, SessionState>();
@@ -26,6 +27,11 @@ export function updateFormField(id: string, field: keyof FormData, value: unknow
 
 export function appendCvSignal(id: string, signal: CVSignal) {
   store.get(id)?.cvSignals.push(signal);
+}
+
+export function setDeviceFingerprint(id: string, fp: DeviceFingerprint) {
+  const s = store.get(id);
+  if (s) s.deviceFingerprint = fp;
 }
 
 export function appendTranscript(id: string, text: string) {
@@ -55,6 +61,13 @@ export function buildRiskInput(id: string) {
   const faceRatio = signals.length
     ? signals.filter((s) => s.face_present).length / signals.length
     : 0;
+  const textureScores = signals
+    .map((sig) => sig.texture_score)
+    .filter((v): v is number => v != null);
+  const textureScoreAvg = textureScores.length
+    ? textureScores.reduce((a, b) => a + b, 0) / textureScores.length
+    : 0.85;
+
   return {
     session_id: id,
     form_data: s.formData as FormData,
@@ -63,7 +76,9 @@ export function buildRiskInput(id: string) {
       avg_liveness: avgLiveness,
       min_liveness: minLiveness,
       face_present_ratio: faceRatio,
+      texture_score_avg: textureScoreAvg,
     },
     transcript_snippets: s.transcriptSnippets,
+    device_fingerprint: s.deviceFingerprint,
   };
 }

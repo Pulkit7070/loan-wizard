@@ -27,15 +27,19 @@ class PolicyEngine:
 
         # ---- Hard-fail rules ----
 
-        declared_age = form.declared_age or 0
-        avg_age = cv.avg_age_estimate or 0
+        declared_age = form.declared_age  # Optional[int]
+        avg_age = cv.avg_age_estimate    # Optional[float]
 
-        if declared_age < 21 or avg_age < 21:
+        # Fail only when a known age signal is below 21; no signal → pass
+        age_below = (declared_age is not None and declared_age < 21) or \
+                    (avg_age is not None and avg_age < 21)
+        if age_below:
             failed.append("age_below_21")
         else:
             passed.append("age_below_21")
 
-        if declared_age > 65:
+        # Above-65 only applies when declared_age is actually provided
+        if declared_age is not None and declared_age > 65:
             failed.append("age_above_65")
         else:
             passed.append("age_above_65")

@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import './globals.css';
+import { I18nProvider } from '../components/I18nProvider';
 
 export const metadata: Metadata = {
   title: 'Loan Wizard — Instant Offer',
@@ -7,9 +9,14 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = cookies();
+  const tenant = cookieStore.get('tenant')?.value ?? 'alpha';
+
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-[#fafafa] text-[#0a2540]">{children}</body>
+    <html lang="en" data-theme={tenant}>
+      <body>
+        <I18nProvider>{children}</I18nProvider>
+      </body>
     </html>
   );
 }

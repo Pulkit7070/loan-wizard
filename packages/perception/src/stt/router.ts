@@ -18,11 +18,23 @@ export class STTRouter {
   }
 
   startAudioCapture(stream: MediaStream): void {
-    this.audioBuffer.start(stream);
+    // Only spin up the MediaRecorder if we actually have a Whisper endpoint
+    // to send audio to. Otherwise it's wasted work and a source of errors.
+    if (!this.fallbackUrl) return;
+    try {
+      this.audioBuffer.start(stream);
+    } catch (err) {
+      // Fallback path becomes unavailable; primary STT still works
+      console.warn('[STTRouter] audio capture failed, whisper fallback disabled', err);
+    }
   }
 
   stopAudioCapture(): void {
-    this.audioBuffer.stop();
+    try { this.audioBuffer.stop(); } catch { /* noop */ }
+  }
+
+  getLastAudioBlob(): Blob | null {
+    return this.audioBuffer.getBlob();
   }
 
   async resolve(primary: STTResult): Promise<STTResult> {

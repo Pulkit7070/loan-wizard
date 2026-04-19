@@ -19,7 +19,10 @@ export function stopStream(stream: MediaStream): void {
 }
 
 export function attachStreamToVideo(stream: MediaStream, el: HTMLVideoElement): void {
+  // Idempotent: don't reset srcObject if the same stream is already attached,
+  // otherwise each render-triggered call causes the <video> to flicker.
+  if (el.srcObject === stream) return;
   el.srcObject = stream;
   el.muted = true;
-  el.play().catch(() => {/* autoplay policy – user gesture starts it */});
+  el.play().catch(() => {/* autoplay policy – retry on user gesture */});
 }
