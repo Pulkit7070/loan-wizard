@@ -6,7 +6,7 @@ export function ConsentBanner() {
   const [open, setOpen] = useState(true);
   if (!open) return null;
   return (
-    <div className="bg-navy text-white text-sm px-4 py-3 flex items-center justify-between">
+    <div className="bg-(--color-brand) text-(--color-brand-fg) text-sm px-4 py-3 flex items-center justify-between">
       <span>
         <strong>DPDP Notice:</strong> We collect video, audio, and location data to process your
         loan application per RBI guidelines. Data is retained for 5 years.{' '}

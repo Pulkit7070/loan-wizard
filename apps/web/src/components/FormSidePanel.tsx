@@ -15,7 +15,7 @@ export function FormSidePanel({ form }: { form: Partial<FormData> }) {
 
   return (
     <div className="h-full flex flex-col gap-4 p-6 bg-white border-l border-gray-200">
-      <h2 className="text-lg font-semibold text-navy">Application Details</h2>
+      <h2 className="text-lg font-semibold text-(--color-brand)">Application Details</h2>
       <div className="flex flex-col gap-3">
         <AnimatePresence>
           {fields.map(({ key, label, format }) =>
@@ -27,7 +27,7 @@ export function FormSidePanel({ form }: { form: Partial<FormData> }) {
                 className="flex flex-col gap-0.5"
               >
                 <span className="text-xs text-gray-500 uppercase tracking-wide">{label}</span>
-                <span className="text-base font-medium text-navy capitalize">
+                <span className="text-base font-medium text-(--color-brand) capitalize">
                   {format ? format(form[key]) : String(form[key])}
                 </span>
               </motion.div>
