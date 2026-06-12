@@ -2,18 +2,19 @@
 
 @theme {
   /* Brand tokens — overridden per tenant via data-theme */
-  --color-brand: var(--brand, #0a2540);
-  --color-brand-fg: var(--brand-fg, #ffffff);
-  --color-bg: var(--bg, #fafafa);
-  --color-surface: var(--surface, #ffffff);
-  --color-fg: var(--fg, #0a2540);
-  --color-muted: var(--muted, #6b7280);
-  --color-success: var(--success, #10b981);
-  --color-warn: var(--warn, #f59e0b);
-  --color-danger: var(--danger, #ef4444);
-  --color-accent: var(--accent, #f59e0b);
+  --color-brand: var(--brand, #1f4636);
+  --color-brand-fg: var(--brand-fg, #f3efe4);
+  --color-bg: var(--bg, #f4f1e8);
+  --color-surface: var(--surface, #fbf9f2);
+  --color-fg: var(--fg, #221f1a);
+  --color-muted: var(--muted, #756e61);
+  --color-success: var(--success, #1f9d5c);
+  --color-warn: var(--warn, #c4892c);
+  --color-danger: var(--danger, #b8402e);
+  --color-accent: var(--accent, #bf8a2c);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'Fira Mono', monospace;
 
   --radius-sm: 6px;
@@ -22,18 +23,18 @@
   --radius-xl: 24px;
 }
 
-/* ── Alpha theme (navy + gold) ── */
+/* ── Alpha theme (pine + brass on bone paper) ── */
 :root, [data-theme="alpha"] {
-  --brand: #0a2540;
-  --brand-fg: #ffffff;
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --fg: #0a2540;
-  --muted: #6b7280;
-  --success: #10b981;
-  --warn: #f59e0b;
-  --danger: #ef4444;
-  --accent: #f59e0b;
+  --brand: #1f4636;        /* deep pine green */
+  --brand-fg: #f3efe4;     /* warm cream on green */
+  --bg: #f4f1e8;           /* bone paper */
+  --surface: #fbf9f2;      /* warm card */
+  --fg: #221f1a;           /* warm near-black ink */
+  --muted: #756e61;        /* warm taupe */
+  --success: #1f9d5c;      /* brighter emerald (distinct from brand) */
+  --warn: #c4892c;
+  --danger: #b8402e;       /* warm oxblood red */
+  --accent: #bf8a2c;       /* brass gold */
 }
 
 /* ── Beta theme (emerald + slate) ── */
@@ -53,10 +54,13 @@
 /* ── Dark mode ── */
 @media (prefers-color-scheme: dark) {
   [data-theme="alpha"] {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --fg: #e6edf3;
-    --muted: #8b949e;
+    --brand: #235039;
+    --brand-fg: #f3efe4;
+    --bg: #14130e;          /* warm charcoal, no blue */
+    --surface: #1d1b14;
+    --fg: #ece7da;          /* warm bone text */
+    --muted: #9b9384;
+    --accent: #d4a23f;
   }
   [data-theme="beta"] {
     --bg: #0a0f1a;
@@ -84,3 +88,36 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 99px; }
+
+/* ── Ledger Terminal type helpers ── */
+.font-display { font-family: var(--font-display); font-optical-sizing: auto; }
+.font-mono    { font-family: var(--font-mono); }
+.nums         { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* Fine ruled hairline used across editorial sections */
+.rule { background-image: linear-gradient(to right, color-mix(in srgb, var(--fg) 16%, transparent), transparent); }
+
+/* HUD scanline sweep over the live terminal video */
+@keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(700%); } }
+.scanline::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 14%;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  animation: scanline 3.4s linear infinite; pointer-events: none;
+}
+
+/* Faint blueprint grid backdrop */
+.grid-ink {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--fg) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--fg) 5%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Running ticker marquee */
+@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.ticker-track { animation: ticker 32s linear infinite; will-change: transform; }
+
+/* Reduce motion: respect user preference */
+@media (prefers-reduced-motion: reduce) {
+  .scanline::after, .ticker-track { animation: none; }
+}
