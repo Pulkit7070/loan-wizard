@@ -43,15 +43,15 @@ export default function ProcessingPage({ params }: { params: { id: string } }) {
             <p className="text-red-600 font-medium mb-4">{error}</p>
             <button
               onClick={() => { setError(''); window.location.reload(); }}
-              className="px-6 py-2 bg-navy text-white rounded-lg"
+              className="px-6 py-2 bg-(--color-brand) text-white rounded-lg"
             >
               Retry
             </button>
           </div>
         ) : (
           <>
-            <div className="w-16 h-16 border-4 border-navy border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-            <p className="text-xl font-semibold text-navy">{messages[msgIdx]}</p>
+            <div className="w-16 h-16 border-4 border-(--color-brand) border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+            <p className="text-xl font-semibold text-(--color-brand)">{messages[msgIdx]}</p>
             <p className="text-gray-500 text-sm mt-2">This takes about 10 seconds</p>
           </>
         )}
